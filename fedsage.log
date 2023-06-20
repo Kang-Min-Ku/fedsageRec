@@ -1,0 +1,13 @@
+2023-06-20 12:09:00,806 - root - INFO - import config
+2023-06-20 12:09:00,807 - root - INFO - import louvain_networkx
+2023-06-20 12:09:00,811 - root - INFO - import dataowner
+2023-06-20 12:09:00,812 - root - INFO - import data
+2023-06-20 12:09:00,812 - root - INFO - import recommendation
+2023-06-20 12:09:00,813 - root - INFO - import local LightGCN
+2023-06-20 12:09:00,814 - root - INFO - import local LightGCN PLUS
+2023-06-20 12:09:00,814 - root - INFO - import fed LightGCN
+2023-06-20 12:09:00,814 - root - INFO - info fed LightGCN Plus
+2023-06-20 12:09:00,814 - root - INFO - import global
+2023-06-20 12:09:00,814 - root - INFO - import preprocessing
+2023-06-20 12:09:01,687 - root - INFO - Load Data
+2023-06-20 12:09:01,687 - root - INFO - Process Data

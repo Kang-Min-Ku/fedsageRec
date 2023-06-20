@@ -82,7 +82,7 @@ def set_up_system():
     # Process Data
     
     # Global Task 진행한 후에 Global 결과까지 도출해야함
-    global_task = Global(plain_adj, test)
+    #global_task = Global(plain_adj, test)
     #print(str(plain_adj))
 
     # 각 Subgraph로 변환해주고, Neighbor edge 정리
@@ -108,7 +108,7 @@ def set_up_system():
     dataowner_list_fed = dataowner_list.copy()
     
     # Local LGCN -> 각각 Stellargraph에 대해서 Train, Test Set으로 분류하고, Local LightGCN을 진행    
-    loc_lightgcn = loc_LightGCN(dataowner_list, test)
+    #loc_lightgcn = loc_LightGCN(dataowner_list, test)
     
     # Local LGCN Plus -> 각각 Stellargraph행 대해서 Graph Mending 진행하고, Train, Test Set으로 분류하고 Local LightGCN을 진행
     local_owners = []
@@ -122,10 +122,10 @@ def set_up_system():
         local_owners.append(local_gen)
         #print('local_owners len neighgen - ' + str(len(local_gen.edges)))
 
-    loc_lightgcnplus = loc_LightGCNPlus(local_owners, test)
+    #loc_lightgcnplus = loc_LightGCNPlus(local_owners, test)
     
     # fed LGCN -> 각각 Stellargraph에 대해서 Train, Test Set으로 분류하고, fed LightGCN을 진행
-    fed_lightgcn = fed_LightGCN(dataowner_list_fed, test, plain_adj) 
+    #fed_lightgcn = fed_LightGCN(dataowner_list_fed, test, plain_adj) 
     
     # -> Global Model에서 진행하는 건 Local에서 변화가 있을 때만 진행해야할 듯? FedAvg처럼
     # fed LGCN Plus -> 각각 Stellargraph에 대해서 Graph Mending 진행하고, Train, Test Set으로 분류하고 Fed LightGCN을 진행
