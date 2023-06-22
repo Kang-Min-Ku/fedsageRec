@@ -1,13 +1,15 @@
 import torch
-root_path = "/home/wooseok/.conda/envs/fedLightGCN/fedLightGCN-main/"
+root_path = "/home/netisen2/gdve/baseline/fedsagerec/"
 no_cuda = False
 cuda = not no_cuda and torch.cuda.is_available()
+device = "cuda" if cuda else "cpu"
 #cuda=False
 
 dataset = "ml-100k"
-num_owners = 3
+num_owners = 10
 delta = 20
 load_data = root_path+"dataowner/"+dataset
+global_data_ratio = 0.5
 
 num_samples = [5, 5]
 batch_size = 2048
@@ -18,12 +20,12 @@ lr = 0.001
 weight_decay = 1e-4
 hidden = 32
 dropout = 0.15
-n_layers = 3
+n_layers = 2
 
-gen_epochs = 50
+gen_epochs = 10
 num_pred = 30
 hidden_portion = 0.15
-top_k = 10
+top_k = 100
 
 epoch_recommendation = 100
 recommendation_layer_sizes = [64, 32]
