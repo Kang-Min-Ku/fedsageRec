@@ -120,7 +120,14 @@ def compute_metrics(pred_u, target_u, top_k):
         hit_rate_k = num_hits / num_target_items
         recall_k = num_hits / min(num_target_items, top_k)        
 
-    prec_k = num_hits / top_k
-    ndcg_k = dcg_k / idcg_k
+    try:
+        prec_k = num_hits / top_k
+    except:
+        prec_k = 0
+        
+    try:
+        ndcg_k = dcg_k / idcg_k
+    except:
+        ndcg_k = 0
 
     return prec_k, recall_k, ndcg_k, hit_rate_k
