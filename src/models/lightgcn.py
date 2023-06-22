@@ -34,7 +34,7 @@ class LightGCN(nn.Module):
         #self.device = 'cpu'
         # GPU 시용 nvidia-smi로 확인
         #self.device = torch.device('cuda')
-        self.device = torch.device('cuda:3')
+        self.device = config.device
         
         self.emb_size = config.latent_dim
         
@@ -111,6 +111,8 @@ class LightGCN(nn.Module):
     
     def fit(self):
         user_idx = np.arange(self.num_users)
+        patience = 0
+        best_score = 0.
         
         for epoch in range(self.num_epochs):
             epoch_loss = 0.0
@@ -138,12 +140,34 @@ class LightGCN(nn.Module):
                 with torch.no_grad():
                     self.eval()
                     
-                    top_k = 20
+                    top_k = config.top_k
                     print("[LightGCN] epoch %d, loss: %f"%(epoch, epoch_loss))
                     
                     prec, recall, ndcg, hit = eval_implicit(self, self.train_data, self.test_data, top_k)
                     print(f"(LightGCN) prec@{top_k} {prec}, recall@{top_k} {recall}, ndcg@{top_k} {ndcg}, hit@{top_k} {hit}")
                     self.train()
+
+                    if config.early_stopping_policy == "recall":
+                        if recall > best_score:
+                            best_score = recall
+                            patience = 0
+                        else:
+                            patience += 1
+                    elif config.early_stopping_policy == "ndcg":
+                        if ndcg > best_score:
+                            best_score = ndcg
+                            patience = 0
+                        else:
+                            patience += 1
+                    elif config.early_stopping_policy == "hit":
+                        if hit > best_score:
+                            best_score = hit
+                            patience = 0
+                        else:
+                            patience += 1
+            if config.use_early_stopping and patience > config.early_stopping_patience:
+                print("Early Stopping")
+                break
                     
     def train_model_per_batch(self, train_matrix, batch_users, pos_items=0, neg_items=0):
         self.optimizer.zero_grad()
