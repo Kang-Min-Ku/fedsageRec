@@ -1,25 +1,35 @@
+import random as rd
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
+import torch.optim as optim
+from src.util import config
+from scipy.sparse import vstack, coo_matrix, csr_matrix
+from src.util.eval_implicit import eval_implicit
 
 class NGCF(nn.Module):
-    def __init__(self, n_user, n_item, norm_adj, args):
+    def __init__(self, n_user, n_item, dataset, norm_adj):
         super(NGCF, self).__init__()
         self.n_user = n_user
         self.n_item = n_item
-        self.device = args.device
-        self.emb_size = args.embed_size
-        self.batch_size = args.batch_size
-        self.node_dropout = eval(args.node_dropout)[0]
-        self.mess_dropout = eval(args.mess_dropout)
+        #self.device = config.device
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.emb_size = config.latent_dim
+        self.batch_size = config.batch_size
+        self.node_dropout = config.dropout
+        self.mess_dropout = config.mess_dropout
 
         self.norm_adj = norm_adj
 
-        self.layers = eval(args.layer_size)
-        self.decay = eval(args.regs)[0]
+        self.layers = config.layers
+        self.reg = config.regs
+        self.bpr_decay = config.bpr_decay
         self.embedding_dict, self.weight_dict = self.init_weight()
         self.sparse_norm_adj = self._convert_sp_mat_to_sp_tensor(self.norm_adj).to(self.device)
+
+        self.optimizer = config.optimizer(self.parameters(), lr=config.lr, weight_decay=self.reg)
+        self.dataset = dataset
 
     def init_weight(self):
         # xavier init
@@ -77,7 +87,7 @@ class NGCF(nn.Module):
                        + torch.norm(pos_items) ** 2
                        + torch.norm(neg_items) ** 2) / 2
 
-        emb_loss = self.decay * regularizer / self.batch_size
+        emb_loss = self.bpr_decay * regularizer / self.batch_size
 
         return mf_loss + emb_loss, mf_loss, emb_loss
 
@@ -133,5 +143,118 @@ class NGCF(nn.Module):
         neg_i_g_embeddings = i_g_embeddings[neg_items, :]
 
         return u_g_embeddings, pos_i_g_embeddings, neg_i_g_embeddings
+    
+    def train_model_per_batch(self, users, pos_items, neg_items):
+        self.optimizer.zero_grad()
+        u_g_embeddings, pos_i_g_embeddings, neg_i_g_embeddings = self.forward(users, pos_items, neg_items)
+        batch_loss, batch_mf_loss, batch_emb_loss = self.create_bpr_loss(u_g_embeddings,
+                                                                         pos_i_g_embeddings,
+                                                                         neg_i_g_embeddings
+                                                                        )
+        batch_loss.backward()
+        self.optimizer.step()
+
+        return batch_loss
+    
+    def fit(self):
+        user_idx = np.arange(self.n_user)
+        patience = 0
+        best_score = 0.
+
+        for epoch in range(config.epochs_local):
+            epoch_loss = 0.
+            self.train()
+
+            np.random.RandomState(1234).shuffle(user_idx)
+            batch_num = len(user_idx) // self.batch_size + 1
+
+            for batch_idx in range(batch_num):
+                try:
+                    batch_users = user_idx[batch_idx*self.batch_size:(batch_idx+1)*self.batch_size]
+                except:
+                    batch_users = user_idx[batch_idx*self.batch_size:]
+
+                batch_users, batch_pos_items, batch_neg_items = self.sample_pair(batch_users)
+                batch_loss = self.train_model_per_batch(batch_users, batch_pos_items, batch_neg_items)
+
+                if torch.isnan(batch_loss):
+                    print('Loss NaN. Train finish.')
+                    break
+                
+                epoch_loss += batch_loss
+
+            if epoch % config.test_every == 0:
+                with torch.no_grad():
+                    self.eval()
+                    top_k = config.top_k
+
+                    prec, recall, ndcg, hit = eval_implicit(self.dataset["train"], self.dataset["valid"], top_k)
+
+                    if epoch % config.print_every == 0:
+                        print("[NGCF] epoch %d, loss: %f"%(epoch, epoch_loss))
+                        print(f"(NGCF) prec@{top_k} {prec}, recall@{top_k} {recall}, ndcg@{top_k} {ndcg}, hit@{top_k} {hit}")
+                    self.train()
+
+                    if config.early_stopping_policy == "recall":
+                        if recall > best_score:
+                            best_score = recall
+                            patience = 0
+                        else:
+                            patience += 1
+                    elif config.early_stopping_policy == "ndcg":
+                        if ndcg > best_score:
+                            best_score = ndcg
+                            patience = 0
+                        else:
+                            patience += 1
+                    elif config.early_stopping_policy == "hit":
+                        if hit > best_score:
+                            best_score = hit
+                            patience = 0
+                        else:
+                            patience += 1
+
+            if config.use_early_stopping and patience > config.early_stopping_patience:
+                print("Early Stopping")
+                break                
+    
+    def sample_pair(self, users):
+        csr_adj_mat = csr_matrix(self.norm_adj)
+        def sample_pos_items_for_u(u, num):
+            # sample num pos items for u-th user
+            # pos_items = self.train_items[u]
+            pos_items = csr_adj_mat[u].nonzero()[1]
+            n_pos_items = len(pos_items)
+            pos_batch = []
+            while True:
+                if len(pos_batch) == num:
+                    break
+                pos_id = np.random.randint(low=0, high=n_pos_items, size=1)[0]
+                pos_i_id = pos_items[pos_id]
+
+                if pos_i_id not in pos_batch:
+                    pos_batch.append(pos_i_id)
+            return pos_batch
+
+        def sample_neg_items_for_u(u, num):
+            # sample num neg items for u-th user
+            neg_items = []
+            while True:
+                if len(neg_items) == num:
+                    break
+                neg_id = np.random.randint(low=0, high=self.n_items,size=1)[0]
+                if neg_id not in csr_adj_mat[u].nonzero()[1] and neg_id not in neg_items:
+                    neg_items.append(neg_id)
+            return neg_items
+        
+        pos_items, neg_items = [], []
+        for u in users:
+            pos_items += sample_pos_items_for_u(u, 1)
+            neg_items += sample_neg_items_for_u(u, 1)
+
+        return users, pos_items, neg_items
+
+
+
 
 
