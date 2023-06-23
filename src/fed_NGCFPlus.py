@@ -54,16 +54,6 @@ def train_fedgen(local_owners:list, feat_shape:int):
             output_missing, output_feat = local_model(input_feat, input_edge, input_adj)
             output_missing = torch.flatten(output_missing)
             output_feat = output_feat.view(len(local_owners[i].all_ids), local_owners[i].num_pred, local_owners[i].feat_shape)
-            # print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
-            # #print(output_feat, output_missing)
-            # print(output_feat[0], output_missing[0],
-            #       local_owners[i].all_targets_missing[local_owners[i].train_ilocs].reshape(-1).float()[0],
-            #       local_owners[i].all_targets_feat[local_owners[i].train_ilocs][0])
-            # print(output_feat.size(), output_missing.size(),
-            #       local_owners[i].all_targets_missing[local_owners[i].train_ilocs].reshape(-1).float().size(),
-            #       local_owners[i].all_targets_feat[local_owners[i].train_ilocs].size())
-            # print(np.unique(output_missing.detach().cpu().numpy()))
-            # print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
             loss_train_missing = F.smooth_l1_loss(output_missing[local_owners[i].train_ilocs].float(),
                                                     local_owners[i].all_targets_missing[local_owners[i].
                                                     train_ilocs].reshape(-1).float())
@@ -111,11 +101,6 @@ def train_fedgen(local_owners:list, feat_shape:int):
                                                             local_owners[i].all_targets_missing[
                                                                 local_owners[i].train_ilocs]
                                                             ).unsqueeze(0).mean().float()
-                    # print("###################################################")
-                    # #print(global_target_feat, local_owners[i].all_targets_feat[local_owners[i].train_ilocs])
-                    # print(len(global_target_feat), local_owners[i].all_targets_feat[local_owners[i].train_ilocs].size())
-                    # print("###################################################")
-                    # exit(1)
                     loss += config.b * loss_train_feat_other
             loss = 1.0 / config.num_owners * loss
             loss.backward()
@@ -125,7 +110,7 @@ def train_fedgen(local_owners:list, feat_shape:int):
 
 
 class fed_NGCFPlus:
-    def __init__(self, dataset, testset, global_train_adj, num_users, num_items, encoder_args):
+    def __init__(self, dataset, testset, global_train_adj, num_users, num_items):
         self.dataset = dataset
         self.testset = testset
         self.top_k = config.top_k
@@ -133,7 +118,7 @@ class fed_NGCFPlus:
         self.global_train_adj = global_train_adj # neighgen causes final_mat in fed_lightGCNplus.py -> just test by global train matrix
 
         global_weights = {}
-        local_encoders = [] # NGCF model 
+        self.local_encoders = [] # NGCF model 
         local_datasets = []
         
         #prepare local model & dataset
@@ -144,21 +129,34 @@ class fed_NGCFPlus:
             norm_adj_mat = normalize_matrix.mean_adj_single(adj_mat.todok()) # mean_adj_mat
             dataset_i["norm_adj"] = norm_adj_mat
 
+            num_nodes = adj_mat.shape[0]
+            users_in_owner_i = num_nodes - num_items
+
             train, valid = train_test_split(adj_mat, test_size=config.classifier_valid_ratio, random_state=1234)
             dataset_i["train"] = train
             dataset_i["valid"] = valid
             local_datasets.append(dataset_i)
-
-            encoder = NGCF(num_users, num_items, norm_adj_mat, dataset_i, encoder_args)
-            local_encoders.append(encoder)
+            #encoder = NGCF(num_users, num_items, dataset_i, norm_adj_mat)
+            encoder = NGCF(users_in_owner_i, num_items, dataset_i, norm_adj_mat)
+            self.local_encoders.append(encoder)
 
         for c_round in range(config.communication_round):
+            #aggregate & distribute
             for owner_i in range(self.n_owners):
-                local_encoders[owner_i].fit()
-                aggregated_weights = self.aggregate(local_encoders, config.aggregate_exception)
-                # 여기부터
+                self.local_encoders[owner_i].fit()
+                aggregated_weights = self.aggregate(self.local_encoders, config.aggregate_exception)
+                self._distribute(aggregated_weights, config.aggregate_exception)
+            #test on test data not valid
+            if c_round % config.communication_print_every == 0:
+                with torch.no_grad():
+                    self.eval()
+                    top_k = config.top_k
+
+                    prec, recall, ndcg, hit = eval_implicit(self.local_encoders[0], self.global_train_adj, self.testset, top_k)
+
+                    print(f"round {c_round} prec@{top_k} {prec}, recall@{top_k} {recall}, ndcg@{top_k} {ndcg}, hit@{top_k} {hit}")
     
-    # simple fedavg
+    # simple fedavg -> need weighted avg
     # is this code allow backpropagation?
     def aggregate(self, local_models, exception:list):
         weights = {}
@@ -178,12 +176,12 @@ class fed_NGCFPlus:
 
         return weights
                
-    def distribute(self, exception:list):
+    def _distribute(self, aggregated_weights:dict, exception:list):
         with torch.no_grad():
-            for m in self.local_models:
+            for m in self.local_encoders:
                 for name, param in m.named_parameters():
                     skip = not all([not name.endswith(e) for e in exception])
                     if skip:
                         continue
 
-                    param.copy_(self.global_weights[name] / self.n_owners) #안합쳐져요 ㅅㅂ
+                    param.data.copy_(aggregated_weights[name])
