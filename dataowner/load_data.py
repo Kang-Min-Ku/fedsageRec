@@ -117,7 +117,7 @@ class Data(object):
             adj_mat[self.n_users:,int(self.n_users*i/5.0):int(self.n_users*(i+1.0)/5)] =\
             R[int(self.n_users*i/5.0):int(self.n_users*(i+1.0)/5)].T
         adj_mat = adj_mat.todok()
-        print('already create adjacency matrix', adj_mat.shape, time() - t1)
+        #print('already create adjacency matrix', adj_mat.shape, time() - t1)
         
         t2 = time()
         def normalized_adj_single(adj):
@@ -128,7 +128,7 @@ class Data(object):
             d_mat_inv = sp.diags(d_inv)
 
             norm_adj = d_mat_inv.dot(adj)
-            print('generate single-normalized adjacency matrix.')
+            #print('generate single-normalized adjacency matrix.')
             return norm_adj.tocoo()
 
         def check_adj_if_equal(adj):
@@ -136,13 +136,13 @@ class Data(object):
             degree = np.sum(dense_A, axis=1, keepdims=False)
 
             temp = np.dot(np.diag(np.power(degree, -1)), dense_A)
-            print('check normalized adjacency matrix whether equal to this laplacian matrix.')
+            #print('check normalized adjacency matrix whether equal to this laplacian matrix.')
             return temp
         
         norm_adj_mat = normalized_adj_single(adj_mat + sp.eye(adj_mat.shape[0]))
         mean_adj_mat = normalized_adj_single(adj_mat)
         
-        print('already normalize adjacency matrix', time() - t2)
+        #print('already normalize adjacency matrix', time() - t2)
         return adj_mat.tocsr(), norm_adj_mat.tocsr(), mean_adj_mat.tocsr()
         
     def negative_pool(self):
