@@ -31,6 +31,8 @@ class NGCF(nn.Module):
         self.optimizer = config.optimizer(self.parameters(), lr=config.lr, weight_decay=self.reg)
         self.dataset = dataset
 
+        self.to(self.device)
+
     def init_weight(self):
         # xavier init
         initializer = nn.init.xavier_uniform_
@@ -144,12 +146,12 @@ class NGCF(nn.Module):
 
         return u_g_embeddings, pos_i_g_embeddings, neg_i_g_embeddings
     
-    def train_model_per_batch(self, users, pos_items, neg_items):
+    def train_model_per_batch(self, users, pos_items, neg_items, users_in_owner):
         self.optimizer.zero_grad()
         u_g_embeddings, pos_i_g_embeddings, neg_i_g_embeddings = self.forward(users, pos_items, neg_items)
         batch_loss, batch_mf_loss, batch_emb_loss = self.create_bpr_loss(u_g_embeddings,
                                                                          pos_i_g_embeddings,
-                                                                         neg_i_g_embeddings
+                                                                         neg_i_g_embeddings,
                                                                         )
         batch_loss.backward()
         self.optimizer.step()
@@ -174,8 +176,9 @@ class NGCF(nn.Module):
                 except:
                     batch_users = user_idx[batch_idx*self.batch_size:]
 
-                batch_users, batch_pos_items, batch_neg_items = self.sample_pair(batch_users)
-                batch_loss = self.train_model_per_batch(batch_users, batch_pos_items, batch_neg_items)
+                batch_users, batch_pos_items, batch_neg_items, users_in_owner= \
+                    self.sample_pair(batch_users) #Some users are empty because of test setting
+                batch_loss = self.train_model_per_batch(batch_users, batch_pos_items, batch_neg_items, users_in_owner)
 
                 if torch.isnan(batch_loss):
                     print('Loss NaN. Train finish.')
@@ -187,8 +190,8 @@ class NGCF(nn.Module):
                 with torch.no_grad():
                     self.eval()
                     top_k = config.top_k
-
-                    prec, recall, ndcg, hit = eval_implicit(self.dataset["train"], self.dataset["valid"], top_k)
+                    #error!
+                    prec, recall, ndcg, hit = eval_implicit(self, self.dataset["train"], self.dataset["valid"], top_k)
 
                     if epoch % config.print_every == 0:
                         print("[NGCF] epoch %d, loss: %f"%(epoch, epoch_loss))
@@ -215,7 +218,7 @@ class NGCF(nn.Module):
                             patience += 1
 
             if config.use_early_stopping and patience > config.early_stopping_patience:
-                print("Early Stopping")
+                #print(f"Early Stopping at epoch {epoch}")
                 break                
     
     def sample_pair(self, users):
@@ -230,7 +233,7 @@ class NGCF(nn.Module):
                 if len(pos_batch) == num:
                     break
                 pos_id = np.random.randint(low=0, high=n_pos_items, size=1)[0]
-                pos_i_id = pos_items[pos_id]
+                pos_i_id = pos_items[pos_id] - self.n_user
 
                 if pos_i_id not in pos_batch:
                     pos_batch.append(pos_i_id)
@@ -242,17 +245,32 @@ class NGCF(nn.Module):
             while True:
                 if len(neg_items) == num:
                     break
-                neg_id = np.random.randint(low=0, high=self.n_items,size=1)[0]
+                neg_id = np.random.randint(low=0, high=self.n_item,size=1)[0]
                 if neg_id not in csr_adj_mat[u].nonzero()[1] and neg_id not in neg_items:
                     neg_items.append(neg_id)
             return neg_items
         
-        pos_items, neg_items = [], []
+        sampled_users, pos_items, neg_items = [], [], []
         for u in users:
-            pos_items += sample_pos_items_for_u(u, 1)
-            neg_items += sample_neg_items_for_u(u, 1)
-
-        return users, pos_items, neg_items
+            try:
+                new_pos = sample_pos_items_for_u(u, 1)
+                sampled_users.append(u)
+            except:
+                new_pos = [0]
+            new_neg = sample_neg_items_for_u(u, 1)
+            # try:
+            #     new_pos = sample_neg_items_for_u(u, 1)
+            #     new_neg = sample_neg_items_for_u(u, 1)
+            #     sampled_users.append(u)
+            # except:
+            #     new_pos = 0
+            #     new_neg = 0
+            pos_items += new_pos
+            neg_items += new_neg
+            # pos_items += sample_pos_items_for_u(u, 1)
+            # neg_items += sample_neg_items_for_u(u, 1)
+        return users, pos_items, neg_items, sampled_users
+        #return users, pos_items, neg_items
 
 
 
