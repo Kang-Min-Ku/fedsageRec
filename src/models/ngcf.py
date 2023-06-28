@@ -6,7 +6,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from src.util import config
 from scipy.sparse import vstack, coo_matrix, csr_matrix
-from src.util.eval_implicit import eval_implicit
+from src.util.eval_implicit import eval_implicit, eval_implicit_NGCF
 
 class NGCF(nn.Module):
     def __init__(self, n_user, n_item, dataset, norm_adj):
@@ -96,7 +96,7 @@ class NGCF(nn.Module):
     def rating(self, u_g_embeddings, pos_i_g_embeddings):
         return torch.matmul(u_g_embeddings, pos_i_g_embeddings.t()) #matmul은 벡터와 메트릭스 자유롭게 계산
 
-    def forward(self, users, pos_items, neg_items, drop_flag=True):
+    def forward(self, users, pos_items, neg_items, drop_flag=False):
         #dropout한 adjacency matrix 엣지 유무
         A_hat = self.sparse_dropout(self.sparse_norm_adj,
                                     self.node_dropout,
@@ -140,10 +140,15 @@ class NGCF(nn.Module):
         *********************************************************
         look up.
         """
+        #print('i_g_embeddings - ' + str(len(i_g_embeddings)))
+        #print('pos items - ' + str(pos_items))
+        
+        #print('user embeddings - ' + str(len(u_g_embeddings))) 
+        
         u_g_embeddings = u_g_embeddings[users, :]
         pos_i_g_embeddings = i_g_embeddings[pos_items, :]
         neg_i_g_embeddings = i_g_embeddings[neg_items, :]
-
+        
         return u_g_embeddings, pos_i_g_embeddings, neg_i_g_embeddings
     
     def train_model_per_batch(self, users, pos_items, neg_items, users_in_owner):
@@ -186,16 +191,17 @@ class NGCF(nn.Module):
                 
                 epoch_loss += batch_loss
 
+            '''
             if epoch % config.test_every == 0:
                 with torch.no_grad():
                     self.eval()
                     top_k = config.top_k
                     #error!
-                    prec, recall, ndcg, hit = eval_implicit(self, self.dataset["train"], self.dataset["valid"], top_k)
+                    ndcg, prec, recall = eval_implicit_NGCF(self, self, self.dataset["train"], self.dataset["valid"], top_k)
 
                     if epoch % config.print_every == 0:
                         print("[NGCF] epoch %d, loss: %f"%(epoch, epoch_loss))
-                        print(f"(NGCF) prec@{top_k} {prec}, recall@{top_k} {recall}, ndcg@{top_k} {ndcg}, hit@{top_k} {hit}")
+                        print(f"(NGCF) prec@{top_k} {prec}, recall@{top_k} {recall}, ndcg@{top_k} {ndcg}")
                     self.train()
 
                     if config.early_stopping_policy == "recall":
@@ -210,16 +216,11 @@ class NGCF(nn.Module):
                             patience = 0
                         else:
                             patience += 1
-                    elif config.early_stopping_policy == "hit":
-                        if hit > best_score:
-                            best_score = hit
-                            patience = 0
-                        else:
-                            patience += 1
 
             if config.use_early_stopping and patience > config.early_stopping_patience:
                 #print(f"Early Stopping at epoch {epoch}")
-                break                
+                break     
+                '''           
     
     def sample_pair(self, users):
         csr_adj_mat = csr_matrix(self.norm_adj)
@@ -272,7 +273,13 @@ class NGCF(nn.Module):
         return users, pos_items, neg_items, sampled_users
         #return users, pos_items, neg_items
 
-
-
-
-
+    def predict(self, user_ids, item_ids):        
+        with torch.no_grad():
+            u_g_embeddings, pos_embeddings, _ = self.forward(user_ids, 0, 0)
+            scores = self.rating(u_g_embeddings, pos_embeddings)
+            predict_ = scores.detach().cpu().numpy()
+            
+            #print('predict len - ' + str(len(predict_)))
+            #print('item_ids len - ' + str(len(item_ids)))
+            
+            return predict_

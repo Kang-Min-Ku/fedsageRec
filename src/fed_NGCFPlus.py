@@ -20,7 +20,7 @@ from scipy.sparse import vstack, coo_matrix, csr_matrix
 from src.models.lightgcn import LightGCN
 from src.models.ngcf import NGCF
 from src.loc_lightGCNPlus import LocalOwner
-from src.util.eval_implicit import eval_implicit
+from src.util.eval_implicit import eval_implicit, eval_implicit_NGCF, eval_implicit_NGCF_total
 import src.util.normalize_matrix as normalize_matrix
 
 """
@@ -149,12 +149,12 @@ class fed_NGCFPlus:
             #test on test data not valid
             if c_round % config.communication_print_every == 0:
                 with torch.no_grad():
-                    self.eval()
+                    #self.eval()
                     top_k = config.top_k
 
-                    prec, recall, ndcg, hit = eval_implicit(self.local_encoders[0], self.global_train_adj, self.testset, top_k)
-
-                    print(f"round {c_round} prec@{top_k} {prec}, recall@{top_k} {recall}, ndcg@{top_k} {ndcg}, hit@{top_k} {hit}")
+                    #print('global train adj - ' + str(global_train_adj))
+                    ndcg, prec, recall = eval_implicit_NGCF_total(self, self.local_encoders[0], self.global_train_adj, self.testset, top_k)
+                    print(f"round {c_round} prec@{top_k} {prec}, recall@{top_k} {recall}, ndcg@{top_k} {ndcg}")
     
     # simple fedavg -> need weighted avg
     # is this code allow backpropagation?
