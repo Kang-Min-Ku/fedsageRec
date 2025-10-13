@@ -38,7 +38,7 @@ git clone https://github.com/Kang-Min-Ku/FedGDVE.git
 # Citation
 
 ```bibtex
-@article{kang2025federated,
+@article{gdve2025federated,
   title={Federated recommender system with data valuation for e-commerce platform},
   author={Park, Jongwon and Kang, Minku and Sim, Wooseok and Lee, Soyoung and Park, Hogun},
   journal={Expert Systems with Applications},
