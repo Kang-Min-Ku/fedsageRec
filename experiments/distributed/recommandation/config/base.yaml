@@ -1,0 +1,80 @@
+config_token: base
+test_type: base_ml100k
+#shell script config
+dataset: ml-100k
+data_path: ./../../../data
+gpu_server_num: 1
+gpu_num_per_server: 3
+model: ngcf
+partition_method: diri #homo, diri
+client_num_in_total: 10
+client_num_per_round: 1
+comm_round: 31
+epochs: 10
+batch_size: 1024
+lr: 0.004
+# default config
+backend: MPI
+is_mobile: 0
+frequency_of_the_test: 1
+embed_size: 64
+layer_size: "[64,64,64]"
+node_dropout_flag: 1
+node_dropout: "[0.1]"
+mess_dropout: "[0.1,0.1,0.1]"
+Ks: "[20,40,60,80,100]"
+save_flag: 0
+test_flag: part
+#log config
+is_log_in_test_type_dir: true #if true make log directory by test type and store log, else store log in log_dir_path
+log_dir_path: log
+log_file: base.log
+#metric config
+top_k: 100
+#cuda
+worker: 0 #If -1, program finds the most free gpu and uses it. If you want to use particular gpu, specify your walker as int e.g. 0,1,2
+#telegram
+send_telegram_after_complete: false
+#seed
+seed: 0
+#--------------------model config-----------------------
+#GDVE config
+dve_lr: 0.0007
+epsilon: 0.00000001
+baseline_delta: 0.001
+dve_epochs: 1
+patience: 10
+#relieve bad embedding init
+use_BPR_annealing: false
+use_CL_annealing: true #use CL & SL.
+use_SL_annealing: true #same above
+annealing_function: exponential_decreasing #linear, sigmoid, exponential_increasing, exponential_decreasing
+BPR_temperature: 5
+CL_temperature: 5
+SL_temperature: 5
+anneal_by_max_round: false
+comm_round_environ_key: COMMROUND #this should not be changed
+first_annealing_round: 10 #start to increase the regularization coefficient after specified round.
+#loss contribution
+bpr_reg: 0.01 #bpr loss regulation
+ssl_reg: 0.000001 #structure loss regulation
+proto_reg: 0.000008 #clustering loss regulation
+#NGCF config
+n_layers: 3
+ssl_temp: 0.1
+alpha: 1
+hyper_layers: 1
+cluster_k: 12
+decay: 0.00001
+# GDVE+/- on/off in SL -> terrible length config
+sl_new_user_score_ratio: 0.1
+sl_new_item_score_ratio: 0.1
+sl_use_user_gdve_plus: true
+sl_use_user_gdve_minus: true # not implemented
+sl_use_item_gdve_plus: true
+sl_use_item_gdve_minus: true # not implemented
+# loss config
+use_CL: true
+use_SL: true
+# GDVE
+use_gdve: true
