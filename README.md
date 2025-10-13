@@ -9,15 +9,15 @@ This repository contains the official implementation of the paper *"Federated Re
 ```bash
 git clone https://github.com/Kang-Min-Ku/FedGDVE.git
 ```
-1. **Download environment**
+2. **Download environment**
 
     Download the pre-configured environment from the following link: 📦[Drive](https://drive.google.com/file/d/1OD0lcIxj49mdtt9ffQwd1cszo8qQUajI/view?usp=drive_link)
 
-2. **Download FedML module**
+3. **Download FedML module**
 
     Since we modified a very old version of [FedML](https://github.com/FedML-AI/FedML), it needs to be downloaded from the following link manually: 📦[Drive](https://drive.google.com/file/d/1QQF2BQp9FNwWcQGWo-H-HHZcZPd2o6Ma/view?usp=drive_link)
 
-3. **Place FedML module in the root directory of this repository.**
+4. **Place FedML module in the root directory of this repository.**
 
 # How to Run
 
