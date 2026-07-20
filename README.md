@@ -11,11 +11,11 @@ git clone https://github.com/Kang-Min-Ku/FedGDVE.git
 ```
 2. **Download environment**
 
-    Download the pre-configured environment from the following link: 📦[Drive](https://drive.google.com/file/d/1OD0lcIxj49mdtt9ffQwd1cszo8qQUajI/view?usp=drive_link)
+    Download the pre-configured environment from the following link: 📦[Drive](https://drive.google.com/file/d/1XUCHeAsnV2gfTxdLoFZN4SvSRocPoELN/view?usp=drive_link)
 
 3. **Download FedML module**
 
-    Since we modified a very old version of [FedML](https://github.com/FedML-AI/FedML), it needs to be downloaded from the following link manually: 📦[Drive](https://drive.google.com/file/d/1QQF2BQp9FNwWcQGWo-H-HHZcZPd2o6Ma/view?usp=drive_link)
+    Since we modified a very old version of [FedML](https://github.com/FedML-AI/FedML), it needs to be downloaded from the following link manually: 📦[Drive](https://drive.google.com/file/d/1fLICEWESNk8QfK0n6cKaWP8z1IPpxjrp/view?usp=drive_link)
 
 4. **Place FedML module in the root directory of this repository.**
 
